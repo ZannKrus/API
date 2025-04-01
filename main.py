@@ -26,16 +26,17 @@ items = [
 ]
 
 class Item(BaseModel):
+    id: int = Field(..., example=2)
     name: str = Field(..., min_length=2, max_length=100, example="Ноутбук")
     price: float = Field(..., gt=0, example=999.99)
     description: Optional[str] = Field(None, max_length=500, example="Мощный ноутбук для игр.")
 
 #1
-@app.get("/items/", response_model=List[dict])
+@app.get("/items/", response_model=List[Item])
 def get_items(
-        name: Optional[str] = Query(None, min_length=2, example="Ноутбук"),
-        min_price: Optional[float] = Query(None, gt=0, example=100),
-        max_price: Optional[float] = Query(None, gt=0, example=1000),
+        name: str|None = Query(None, min_length=2, example="Ноутбук"),
+        min_price: float|None = Query(None, gt=0, example=100),
+        max_price: float|None = Query(None, gt=0, example=1000),
         limit: Optional[int] = Query(10, le=100, example=5)):
 
     filtered_items = items
@@ -51,11 +52,14 @@ def get_items(
 
     if min_price and max_price and min_price > max_price:
         raise HTTPException(status_code=400, detail="min_price не может быть больше max_price")
-
+    
+    if not filtered_items:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    
     return filtered_items[:limit]
 
 #2
-@app.get("/items/{item_id}", response_model=dict)
+@app.get("/items/{item_id}", response_model=Item)
 def get_item(item_id: int = Path(..., gt=0, example=42)):
     for item in items:
         if item["id"] == item_id:
@@ -63,7 +67,7 @@ def get_item(item_id: int = Path(..., gt=0, example=42)):
     raise HTTPException(status_code=404, detail="Товар не найден")
 
 #3
-@app.post("/items/", response_model=dict, status_code=201)
+@app.post("/items/", response_model=Item, status_code=201)
 def create_item(item: Item):
     new_id = max(item["id"] for item in items) + 1
     new_item = {"id": new_id, **item.dict()}
