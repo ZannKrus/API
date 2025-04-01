@@ -66,7 +66,6 @@ def get_item(item_id: int = Path(..., gt=0, example=42)):
 @app.post("/items/", response_model=dict, status_code=201)
 def create_item(item: Item):
     new_id = max(item["id"] for item in items) + 1
-    new_item = item.dict()
-    new_item["id"] = new_id
+    new_item = {"id": new_id, **item.dict()}
     items.append(new_item)
     return new_item
