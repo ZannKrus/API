@@ -6,7 +6,6 @@ app = FastAPI()
 
 @app.get("/about")
 async def about():
-    # Возвращаем информацию о разработчике API
     return {
         "ФИО": "Иванов Иван Иванович",
         "Группа": "Группа 101",
@@ -15,7 +14,6 @@ async def about():
 
 @app.get("/rnd")
 async def get_random():
-    # Возвращаем случайное число от 1 до 10
     return {"Случайное_число": random.randint(1, 10)}
 
 @app.post("/t_square")
