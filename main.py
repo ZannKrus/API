@@ -34,10 +34,10 @@ class Item(BaseModel):
 #1
 @app.get("/items/", response_model=List[Item])
 def get_items(
-        name: str|None = Query(None, min_length=2, example="Ноутбук"),
-        min_price: float|None = Query(None, gt=0, example=100),
-        max_price: float|None = Query(None, gt=0, example=1000),
-        limit: Optional[int] = Query(10, le=100, example=5)):
+        name: str|None = Query(None, min_length=2, examples="Ноутбук"),
+        min_price: float|None = Query(None, gt=0, examples=100),
+        max_price: float|None = Query(None, gt=0, examples=1000),
+        limit: Optional[int] = Query(10, le=100, examples=5)):
 
     filtered_items = items
 
@@ -60,7 +60,7 @@ def get_items(
 
 #2
 @app.get("/items/{item_id}", response_model=Item)
-def get_item(item_id: int = Path(..., gt=0, example=42)):
+def get_item(item_id: int = Path(..., gt=0, examples=42)):
     for item in items:
         if item["id"] == item_id:
             return item
