@@ -31,7 +31,7 @@ class Movie(Base):
     duration_min = Column(Integer, nullable=True)
     rating = Column(Float, nullable=True)
     description = Column(Text, nullable=True)
-    poster_url = Column(String(500), nullable=True) # Путь к файлу или URL
+    poster_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     genres = relationship(

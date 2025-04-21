@@ -10,7 +10,6 @@ import shutil
 import uuid 
 from pathlib import Path 
 
-# --- Настройки ---
 UPLOAD_DIR = "uploads" 
 MAX_FILE_SIZE = 5 * 1024 * 1024 # 5 MB
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}

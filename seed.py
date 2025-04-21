@@ -40,7 +40,6 @@ with SessionLocal() as session:
         duration_min=132,
         rating=8.2,
         description="Нью-йоркский полицейский Джон Макклейн прибывает в Лос-Анджелес, чтобы помириться с женой.",
-        # poster_url="/uploads/placeholder.jpg",
         genres=[genre1, genre5] 
     )
 

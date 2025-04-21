@@ -24,7 +24,7 @@ class MovieBase(BaseModel):
     duration_min: Optional[int] = Field(None, gt=0, example=132)
     rating: Optional[float] = Field(None, ge=0.0, le=10.0, example=8.2)
     description: Optional[str] = Field(None, example="Полицейский спасает заложников в небоскребе.")
-    poster_url: Optional[str] = Field(None, max_length=500, example="/uploads/die_hard_poster.jpg") # Будет обновляться отдельно
+    poster_url: Optional[str] = Field(None, max_length=500, example="/uploads/die_hard_poster.jpg")
 
 class MovieCreate(MovieBase):
     genre_ids: List[int] = Field(..., example=[1, 5]) 
