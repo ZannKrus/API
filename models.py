@@ -39,3 +39,11 @@ class Movie(Base):
         secondary=movie_genres_association,
         back_populates="movies"
     )
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer(), primary_key=True, autoincrement=True, nullable=False)
+    username = Column(String(60), nullable=False, unique=True, index=True) 
+    hashed_password = Column(String(255), nullable=False) 
+    email = Column(String(255), nullable=True, unique=True, index=True) 
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

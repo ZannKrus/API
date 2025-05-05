@@ -2,6 +2,8 @@ from sqlalchemy.orm import Session
 from database import engine, SessionLocal
 import models as m
 import os
+import shutil
+from auth import get_password_hash
 
 DB_FILE = "movielib.db"
 UPLOAD_DIR = "uploads"
@@ -11,7 +13,6 @@ if os.path.exists(DB_FILE):
 
 if os.path.exists(UPLOAD_DIR):
     print(f"Удаление старой папки загрузок: {UPLOAD_DIR}")
-    import shutil
     shutil.rmtree(UPLOAD_DIR) 
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -70,6 +71,14 @@ with SessionLocal() as session:
         genres=[genre4, genre3] 
     )
 
+    print("Добавление тестового пользователя...")
+    test_user = m.User(
+        username="admin",
+        hashed_password=get_password_hash("password"), # Use a strong password in reality
+        email="admin@example.com"
+    )
+    session.add(test_user)
+    print("Тестовый пользователь 'admin' (пароль: 'password') добавлен.")
 
     session.add_all([movie1, movie2, movie3, movie4])
     print("Фильмы добавлены.")

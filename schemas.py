@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, HttpUrl, validator
+from pydantic import BaseModel, Field, HttpUrl, validator, EmailStr
 from typing import List, Optional
 from datetime import datetime
+import re
 
 
 class GenreBase(BaseModel):
@@ -44,3 +45,32 @@ class Movie(MovieBase):
 
     class Config:
         from_attributes = True 
+
+class UserBase(BaseModel):
+    id: int
+    username: str = Field(example="kino_lover")
+    email: Optional[EmailStr] = Field(None, example="user@example.com")
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=60, example="kino_lover")
+    password: str = Field(..., min_length=8, max_length=60, example="SecurePwd123")
+    email: Optional[EmailStr] = Field(None, example="user@example.com")
+
+    @validator('password')
+    def validate_password_complexity(cls, value):
+        errors = []
+        if not re.search(r"\d", value):
+            errors.append("должен содержать хотя бы одну цифру")
+        if not re.search(r"[a-z]", value):
+            errors.append("должен содержать хотя бы одну строчную букву")
+        if not re.search(r"[A-Z]", value):
+            errors.append("должен содержать хотя бы одну заглавную букву")
+
+        if errors:
+            raise ValueError(f"Пароль не соответствует требованиям: {'; '.join(errors)}")
+
+        return value

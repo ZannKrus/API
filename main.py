@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, status
 from fastapi.staticfiles import StaticFiles 
 from sqlalchemy.orm import Session, joinedload 
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import SQLAlchemyError
 from database import get_db, engine 
 import models as m
 import schemas as s
@@ -9,6 +11,7 @@ import os
 import shutil 
 import uuid 
 from pathlib import Path 
+from auth import basic_auth, get_password_hash
 
 UPLOAD_DIR = "uploads" 
 MAX_FILE_SIZE = 5 * 1024 * 1024 # 5 MB
@@ -35,7 +38,6 @@ def validate_poster(file: UploadFile):
     return file
 
 async def save_poster(file: UploadFile) -> str:
-    """Сохраняет файл постера и возвращает относительный путь."""
     extension = file.filename.split(".")[-1].lower()
     unique_filename = f"{uuid.uuid4()}.{extension}"
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
@@ -65,11 +67,57 @@ async def save_poster(file: UploadFile) -> str:
 
     return f"/{UPLOAD_DIR}/{unique_filename}"
 
+@app.post('/users', response_model=s.UserBase, status_code=status.HTTP_201_CREATED, tags=["Пользователи"])
+def register_user(user_in: s.UserCreate, db: Session = Depends(get_db)):
+    existing_user = db.query(m.User).filter(m.User.username == user_in.username).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Пользователь с именем '{user_in.username}' уже существует."
+        )
+    if user_in.email:
+         existing_email = db.query(m.User).filter(m.User.email == user_in.email).first()
+         if existing_email:
+             raise HTTPException(
+                 status_code=status.HTTP_400_BAD_REQUEST,
+                 detail=f"Пользователь с email '{user_in.email}' уже существует."
+             )
 
+    hashed_password = get_password_hash(user_in.password)
+    db_user = m.User(
+        username=user_in.username,
+        hashed_password=hashed_password,
+        email=user_in.email
+    )
+    db.add(db_user)
+    try:
+        db.commit()
+        db.refresh(db_user)
+    except IntegrityError: 
+         db.rollback()
+         raise HTTPException(
+             status_code=status.HTTP_400_BAD_REQUEST,
+             detail="Пользователь с таким именем или email уже существует."
+         )
+    except SQLAlchemyError as e: 
+        db.rollback()
+        print(f"Database error during user creation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось создать пользователя из-за ошибки базы данных."
+        )
+    except Exception as e: 
+        db.rollback()
+        print(f"Unexpected error during user creation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Произошла непредвиденная ошибка при создании пользователя."
+        )
 
-@app.post('/genres', response_model=s.Genre, status_code=status.HTTP_201_CREATED, tags=["Жанры"])
+    return db_user
+
+@app.post('/genres', response_model=s.Genre, status_code=status.HTTP_201_CREATED, tags=["Жанры"], dependencies=[Depends(basic_auth)])
 def create_genre(genre_in: s.GenreCreate, db: Session = Depends(get_db)):
-    """Добавление нового жанра."""
     existing_genre = db.query(m.Genre).filter(m.Genre.name == genre_in.name).first()
     if existing_genre:
         raise HTTPException(
@@ -85,14 +133,12 @@ def create_genre(genre_in: s.GenreCreate, db: Session = Depends(get_db)):
 
 @app.get('/genres', response_model=List[s.Genre], tags=["Жанры"])
 def get_all_genres(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """Получение списка всех жанров с пагинацией."""
     genres = db.query(m.Genre).offset(skip).limit(limit).all()
     return genres
 
 
-@app.post('/movies', response_model=s.Movie, status_code=status.HTTP_201_CREATED, tags=["Фильмы"])
+@app.post('/movies', response_model=s.Movie, status_code=status.HTTP_201_CREATED, tags=["Фильмы"], dependencies=[Depends(basic_auth)])
 def create_movie(movie_in: s.MovieCreate, db: Session = Depends(get_db)):
-    """Добавление нового фильма."""
     genres = db.query(m.Genre).filter(m.Genre.id.in_(movie_in.genre_ids)).all()
     if len(genres) != len(movie_in.genre_ids):
         found_ids = {g.id for g in genres}
@@ -116,21 +162,18 @@ def create_movie(movie_in: s.MovieCreate, db: Session = Depends(get_db)):
 
 @app.get('/movies', response_model=List[s.Movie], tags=["Фильмы"])
 def get_all_movies(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """Получение списка всех фильмов с пагинацией и связанными жанрами."""
     movies = db.query(m.Movie).options(joinedload(m.Movie.genres)).offset(skip).limit(limit).all()
     return movies
 
 @app.get('/movies/{movie_id}', response_model=s.Movie, tags=["Фильмы"])
 def get_movie(movie_id: int, db: Session = Depends(get_db)):
-    """Получение детальной информации о фильме по ID."""
     db_movie = db.query(m.Movie).options(joinedload(m.Movie.genres)).filter(m.Movie.id == movie_id).first()
     if not db_movie:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Фильм не найден")
     return db_movie
 
-@app.put('/movies/{movie_id}', response_model=s.Movie, tags=["Фильмы"])
+@app.put('/movies/{movie_id}', response_model=s.Movie, tags=["Фильмы"], dependencies=[Depends(basic_auth)])
 def update_movie(movie_id: int, movie_in: s.MovieUpdate, db: Session = Depends(get_db)):
-    """Обновление информации о фильме."""
     db_movie = db.query(m.Movie).options(joinedload(m.Movie.genres)).filter(m.Movie.id == movie_id).first() 
     if not db_movie:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Фильм не найден")
@@ -156,9 +199,8 @@ def update_movie(movie_id: int, movie_in: s.MovieUpdate, db: Session = Depends(g
     return db_movie
 
 
-@app.put('/movies/{movie_id}/image', response_model=s.Movie, tags=["Фильмы"])
+@app.put('/movies/{movie_id}/image', response_model=s.Movie, tags=["Фильмы"], dependencies=[Depends(basic_auth)])
 async def upload_movie_poster(movie_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Обновление (загрузка) постера для фильма."""
     db_movie = db.query(m.Movie).filter(m.Movie.id == movie_id).first()
     if not db_movie:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Фильм не найден")
@@ -188,7 +230,7 @@ async def upload_movie_poster(movie_id: int, file: UploadFile = File(...), db: S
     return db_movie_with_genres
 
 
-@app.delete("/movies/{movie_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Фильмы"])
+@app.delete("/movies/{movie_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Фильмы"], dependencies=[Depends(basic_auth)])
 def delete_movie(movie_id: int, db: Session = Depends(get_db)):
     """Удаление фильма по ID."""
     db_movie = db.query(m.Movie).filter(m.Movie.id == movie_id).first()
@@ -207,3 +249,7 @@ def delete_movie(movie_id: int, db: Session = Depends(get_db)):
     db.commit()
     
     return None
+
+@app.get("/users/me", response_model=s.UserBase, tags=["Пользователи"])
+def read_users_me(current_user: m.User = Depends(basic_auth)):
+    return current_user
